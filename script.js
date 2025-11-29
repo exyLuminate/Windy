@@ -22,7 +22,8 @@ const els = {
     favoritesList: document.getElementById('favoritesList'),
     themeToggle: document.getElementById('themeToggle'),
     refreshBtn: document.getElementById('refreshBtn'),
-    unitToggle: document.getElementById('unitToggle')
+    unitToggle: document.getElementById('unitToggle'),
+    locateBtn: document.getElementById('locateBtn'),    
 };
 
 function getWeatherInfo(code) {
@@ -104,6 +105,66 @@ async function getWeatherData(lat, lon, name, country) {
         alert("Gagal mengambil data cuaca. Cek console untuk detail.");
     } finally {
         showLoading(false);
+    }
+}
+
+function getUserLocation() {
+    if (navigator.geolocation) {
+        showLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                
+                try {
+                    // KITA PAKAI API BIGDATACLOUD
+                    // Ini lebih cepat dan jarang error untuk project localhost
+                    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=id`;
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    let cityName = "Lokasi Anda";
+                    let countryName = "Indonesia";
+
+                    // Logika pengambilan nama yang lebih pintar
+                    // Dia otomatis cari nama kota/kabupaten/kecamatan yang paling relevan
+                    if (data.city) {
+                        cityName = data.city;
+                    } else if (data.locality) {
+                        cityName = data.locality;
+                    } else if (data.principalSubdivision) {
+                        cityName = data.principalSubdivision;
+                    }
+                    
+                    // Bersihkan kata-kata administratif biar rapi di UI
+                    cityName = cityName
+                        .replace("Kota ", "")
+                        .replace("Kabupaten ", "")
+                        .replace("Kecamatan ", "");
+
+                    if (data.countryName) countryName = data.countryName;
+                    
+                    // Isi kolom pencarian
+                    els.searchInput.value = cityName;
+
+                    // Panggil data cuaca
+                    getWeatherData(lat, lon, cityName, countryName);
+                    
+                } catch (error) {
+                    console.error("Reverse geocoding failed:", error);
+                    getWeatherData(lat, lon, "Lokasi Terdeteksi", "");
+                }
+            },
+            (error) => {
+                showLoading(false);
+                let msg = "Gagal mendeteksi lokasi.";
+                if(error.code === 1) msg = "Izin lokasi ditolak. Mohon izinkan akses lokasi di browser.";
+                alert(msg);
+            }
+        );
+    } else {
+        alert("Browser Anda tidak mendukung Geolocation.");
     }
 }
 
@@ -289,5 +350,7 @@ function showLoading(show) {
     if (show) els.loadingIndicator.classList.remove('hidden');
     else els.loadingIndicator.classList.add('hidden');
 }
+
+els.locateBtn.addEventListener('click', getUserLocation);
 
 loadFavorites();
