@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Weather Dashboard</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -136,6 +137,15 @@
                     </div>
                 </div>
             </div>
+
+            <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 mt-6 lg:mt-0">
+    <h3 class="font-bold mb-4 text-lg flex items-center gap-2">
+        <i class="fa-solid fa-chart-line text-green-500"></i> Grafik Suhu (24 Jam)
+    </h3>
+    <div class="relative h-64 w-full">
+        <canvas id="weatherChart"></canvas>
+    </div>
+</div>
 
         </div>
     </main>

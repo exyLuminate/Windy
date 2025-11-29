@@ -3,6 +3,7 @@ const WEATHER_API_URL = "https://api.open-meteo.com/v1/forecast";
 let currentUnit = 'C';
 let currentCityData = null;
 let updateInterval;
+let weatherChartInstance = null;
 
 const els = {
     searchInput: document.getElementById('searchInput'),
@@ -76,8 +77,7 @@ async function getWeatherData(lat, lon, name, country) {
     els.suggestionsList.classList.add('hidden');
 
     try {
-        const url = `${WEATHER_API_URL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,is_day,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
-        
+        const url = `${WEATHER_API_URL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,is_day,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=temperature_2m&timezone=auto`;        
         const response = await fetch(url);
         
         if (!response.ok) throw new Error("Gagal mengambil data cuaca");
@@ -96,6 +96,7 @@ async function getWeatherData(lat, lon, name, country) {
 
         updateCurrentUI(currentDataFormatted, name, data.daily);
         updateForecastUI(data.daily);
+        renderChart(data.hourly);
         
         if (updateInterval) clearInterval(updateInterval);
         updateInterval = setInterval(() => getWeatherData(lat, lon, name, country), 300000); 
@@ -117,8 +118,7 @@ function getUserLocation() {
                 const lon = position.coords.longitude;
                 
                 try {
-                    // KITA PAKAI API BIGDATACLOUD
-                    // Ini lebih cepat dan jarang error untuk project localhost
+                    // API BIGDATACLOUD
                     const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=id`;
                     
                     const response = await fetch(url);
@@ -127,8 +127,6 @@ function getUserLocation() {
                     let cityName = "Lokasi Anda";
                     let countryName = "Indonesia";
 
-                    // Logika pengambilan nama yang lebih pintar
-                    // Dia otomatis cari nama kota/kabupaten/kecamatan yang paling relevan
                     if (data.city) {
                         cityName = data.city;
                     } else if (data.locality) {
@@ -137,7 +135,6 @@ function getUserLocation() {
                         cityName = data.principalSubdivision;
                     }
                     
-                    // Bersihkan kata-kata administratif biar rapi di UI
                     cityName = cityName
                         .replace("Kota ", "")
                         .replace("Kabupaten ", "")
@@ -145,10 +142,8 @@ function getUserLocation() {
 
                     if (data.countryName) countryName = data.countryName;
                     
-                    // Isi kolom pencarian
                     els.searchInput.value = cityName;
 
-                    // Panggil data cuaca
                     getWeatherData(lat, lon, cityName, countryName);
                     
                 } catch (error) {
@@ -328,6 +323,10 @@ els.themeToggle.addEventListener('click', () => {
     document.documentElement.classList.toggle('dark');
     const isDark = document.documentElement.classList.contains('dark');
     els.themeToggle.innerHTML = isDark ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+
+    if (currentCityData) {
+        getWeatherData(currentCityData.lat, currentCityData.lon, currentCityData.name, currentCityData.country);
+    }
 });
 
 els.unitToggle.addEventListener('click', () => {
@@ -352,5 +351,62 @@ function showLoading(show) {
 }
 
 els.locateBtn.addEventListener('click', getUserLocation);
+
+function renderChart(hourly) {
+    const ctx = document.getElementById('weatherChart').getContext('2d');
+    
+    const currentHourIndex = new Date().getHours(); 
+    
+    const next24HoursTime = hourly.time.slice(currentHourIndex, currentHourIndex + 24);
+    const next24HoursTemp = hourly.temperature_2m.slice(currentHourIndex, currentHourIndex + 24);
+
+    const labels = next24HoursTime.map(timeStr => {
+        return new Date(timeStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    });
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#cbd5e1' : '#475569'; 
+    const gridColor = isDark ? '#334155' : '#e2e8f0'; 
+
+    if (weatherChartInstance) {
+        weatherChartInstance.destroy();
+    }
+
+    weatherChartInstance = new Chart(ctx, {
+        type: 'line', 
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `Suhu (${currentUnit === 'F' ? '°F' : '°C'})`,
+                data: currentUnit === 'F' ? next24HoursTemp.map(t => (t * 9/5) + 32) : next24HoursTemp,
+                borderColor: '#3b82f6', 
+                backgroundColor: 'rgba(59, 130, 246, 0.1)', 
+                borderWidth: 3,
+                tension: 0.4, 
+                pointRadius: 2,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: textColor }
+                }
+            },
+            scales: {
+                y: {
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { display: false } 
+                }
+            }
+        }
+    });
+}
 
 loadFavorites();
